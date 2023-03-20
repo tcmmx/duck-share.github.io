@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    <title>Babylon.js sample code</title>
+
+    <!-- Babylon.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+    <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+    <script src="https://preview.babylonjs.com/ammo.js"></script>
+    <script src="https://preview.babylonjs.com/cannon.js"></script>
+    <script src="https://preview.babylonjs.com/Oimo.js"></script>
+    <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+    <script src="https://preview.babylonjs.com/babylon.js"></script>
+    <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+    <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+    <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+    <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+    <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+    <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+    <style>
+        html,
+        body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+
+        var startRenderLoop = function (engine, canvas) {
+            engine.runRenderLoop(function () {
+                if (sceneToRender && sceneToRender.activeCamera) {
+                    sceneToRender.render();
+                }
+            });
+        }
+
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function () { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, disableWebGL2Support: false }); };
+        var createScene = async function () {
+            // This creates a basic Babylon Scene object (non-mesh)
+            var scene = new BABYLON.Scene(engine);
+            var hdrTexture = new BABYLON.HDRCubeTexture("https://smashelbow.github.io/test/chun.hdr", scene, 128, false, true, false, true);
+
+            // This creates and positions a free camera (non-mesh)
+            var camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2, Math.PI / 3, 10, BABYLON.Vector3.Zero(), scene)
+            scene.environmentTexture = hdrTexture
+            scene.environmentIntensity = 1
+            // This targets the camera to scene origin
+            camera.setTarget(new BABYLON.Vector3(0, 1, 0));
+
+            // This attaches the camera to the canvas
+            camera.attachControl(canvas, true);
+            camera.wheelPrecision = 100
+            camera.minZ = 1
+            camera.lowerRadiusLimit = 1
+            camera.inertia = 0.9
+            camera.panningInertia = 0.9
+            camera.panningSensibility = 300
+            camera.angularSensibilityX = 800
+            camera.angularSensibilityY = 800
+
+            // Load a GUI from a URL JSON.
+            var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("GUI", true, scene);
+            var loadedGUI = await advancedTexture.parseFromSnippetAsync("#D7L4Z9");
+
+
+            var rect = engine.getRenderingCanvasClientRect();
+
+            var hw = rect.width
+
+            var hh = rect.height
+
+            console.log(rect.width);
+
+            var ortCamFOV = 1000
+            scene.registerBeforeRender(function () {
+
+                rect = engine.getRenderingCanvasClientRect();
+
+                hw = rect.width / ortCamFOV;
+
+                hh = rect.height / ortCamFOV;
+                camera.orthoLeft = -hw * camera.radius;
+
+                camera.orthoRight = hw * camera.radius;
+
+                camera.orthoBottom = -hh * camera.radius;
+
+                camera.orthoTop = hh * camera.radius;
+
+                // camera.beta = 0.01 - 0.01
+                camera.wheelPrecision = 200 / camera.radius
+                camera.panningSensibility = 3000 / camera.radius
+            })
+            var sun = new BABYLON.DirectionalLight("sun", new BABYLON.Vector3(-0.6, -1, -0.8), scene)
+            sun.diffuse = new BABYLON.Color3(1, 0.99, 0.87)
+
+            BABYLON.SceneLoader.Append("https://smashelbow.github.io/test/", "koduck.glb", scene, function (scene) {
+
+                BABYLON.NodeMaterial.ParseFromSnippetAsync("#N1W93B#45", scene).then((node) => {
+                    scene.getMeshByName("Sphere.001").material = node;
+                });
+                // scene.getMeshByName("outline").dispose()
+                scene.getMeshByName("outline").material.albedoColor = BABYLON.Color3.Black()
+
+
+                var shadowGenerator = new BABYLON.ShadowGenerator(512, sun, true);
+                shadowGenerator.getShadowMap().renderList.push(scene.getMeshByName("Sphere.001"))
+                shadowGenerator.setDarkness(0);
+                shadowGenerator.filter = BABYLON.ShadowGenerator.FILTER_BLUREXPONENTIALSHADOWMAP;
+                sun.shadowMinZ = -4
+                sun.shadowMaxZ = 10
+                shadowGenerator.useKernelBlur = true
+                shadowGenerator.blurKernel = 64
+                shadowGenerator.depthScale = 100
+                shadowGenerator.normalBias = 0.1
+                shadowGenerator.blurScale = 1
+                shadowGenerator.bias = 0.01
+
+                scene.getMeshByName("Sphere.001").receiveShadows = true;
+
+                var lplane = BABYLON.MeshBuilder.CreatePlane("lplane", { size: 1, sideOrientation: BABYLON.Mesh.DOUBLESIDE }, scene);
+                var rplane = BABYLON.MeshBuilder.CreatePlane("rplane", { size: 1, sideOrientation: BABYLON.Mesh.DOUBLESIDE }, scene);
+
+                scene.skeletons[0].bones.forEach(sk => {
+                    if (sk.name === "arm.R") {
+                        lplane.attachToBone(sk, scene.getMeshById("__root__"));
+                        lplane.position.y = 0.5
+                        lplane.position.x = 1.2
+                        lplane.rotation.x = Math.PI
+                        lplane.rotation.z = Math.PI / 2
+                        lplane.rotation.y = Math.PI
+
+                    }
+                    if (sk.name === "arm.L") {
+                        rplane.attachToBone(sk, scene.getMeshById("__root__"));
+                        rplane.position.y = 0.5
+                        rplane.position.x = -1.2
+                        rplane.rotation.x = Math.PI
+                        rplane.rotation.z = Math.PI * 1.5
+                        rplane.rotation.y = Math.PI
+
+                    }
+                })
+
+
+                var leftStr = "";
+                var rightStr = "";
+                var shareUrl = window.location
+
+
+                let leftText = decodeURI(getUrlParam("left"));
+                let rightText = decodeURI(getUrlParam("right"));
+                if (leftText) {
+                    leftStr = leftText;
+                    createPlaneTex(scene.getMeshById("lplane"), leftText)
+                }
+                if (rightText) {
+                    rightStr = rightText;
+                    createPlaneTex(scene.getMeshById("rplane"), rightText)
+                }
+
+
+
+
+
+                // Set the ideal W and H if you wish to scale with the window.
+                advancedTexture.idealWidth = 1024;
+                advancedTexture.idealHeight = 1024;
+
+                // Get a control by name a change a property.
+                let backgroundBox = advancedTexture.getControlByName("BackgroundBox");
+                backgroundBox.isVisible = false;
+
+                let showControlButton = advancedTexture.getControlByName("showControlButton");
+                showControlButton.onPointerClickObservable.add(() => {
+                    backgroundBox.isVisible = true;
+                    showControlButton.isVisible = false;
+                });
+                let shareButton = advancedTexture.getControlByName("share_Button");
+                shareButton.onPointerClickObservable.add(() => {
+                    shareUrl = shareURL(leftStr, rightStr);
+                    alert("copy URL to share:  " + shareUrl);
+                });
+                let cancelButton = advancedTexture.getControlByName("cancelButton");
+                cancelButton.onPointerClickObservable.add(() => {
+                    backgroundBox.isVisible = false;
+                    showControlButton.isVisible = true;
+                });
+                let exitButton = advancedTexture.getControlByName("ExitButton");
+                exitButton.onPointerClickObservable.add(() => {
+                    backgroundBox.isVisible = false;
+                    showControlButton.isVisible = true;
+                });
+                let leftInput = advancedTexture.getControlByName("left_InputText");
+                console.log(leftInput)
+                let rightInput = advancedTexture.getControlByName("right_InputText");
+                let saveButton = advancedTexture.getControlByName("saveButton");
+                saveButton.onPointerClickObservable.add(() => {
+                    backgroundBox.isVisible = false;
+                    showControlButton.isVisible = true;
+                    console.log("left", leftInput.text, "right", rightInput.text);
+                    leftStr = leftInput.text
+                    rightStr = rightInput.text
+
+                    createPlaneTex(lplane, leftStr)
+
+                    createPlaneTex(rplane, rightStr)
+
+                });
+
+                leftInput.onTextChangedObservable.add(function (leftInput) { // value is a color3
+                    if (leftInput.text.length > 20) {
+                        alert("too long...")
+                        leftInput.text = "";
+                        leftStr = ""
+                    }
+                });
+                rightInput.onTextChangedObservable.add(function (rightInput) { // value is a color3
+                    if (rightInput.text.length > 20) {
+                        alert("too long...")
+                        rightInput.text = "";
+                        rightStr = ""
+                    }
+                });
+
+                const inputField = document.createElement('input');
+                inputField.type = "text";
+                inputField.style.position = 'absolute';
+                inputField.style.bottom = '40px';
+                inputField.style.right = '20px';
+                // inputField.style.display = 'none';
+
+                document.body.appendChild(inputField);
+
+                leftInput.onPointerClickObservable.add(() => {
+                    inputField.focus();
+                })
+
+                // input.onTextChangedObservable.add((inputtext) => {
+                //     inputField.value = input.text;
+                //     console.log(inputField.value);
+                //     inputField.dispatchEvent(new Event('change'));
+                // });
+
+                leftInput.onFocusObservable.add(() => {
+                    inputField.value = leftInput.text;
+                })
+
+                inputField.addEventListener('keyup', (e) => {
+                    leftInput.text = inputField.value;
+                    console.log('change', inputField.value)
+                });
+
+                scene.onDisposeObservable.add(() => {
+                    inputField.remove();
+                })
+
+                const inputFieldRR = document.createElement('input');
+                inputFieldRR.type = "text";
+                inputFieldRR.style.position = 'absolute';
+                inputFieldRR.style.bottom = '40px';
+                inputFieldRR.style.right = '20px';
+                // inputField.style.display = 'none';
+
+                document.body.appendChild(inputFieldRR);
+
+                rightInput.onPointerClickObservable.add(() => {
+                    inputFieldRR.focus();
+                })
+
+                rightInput.onFocusObservable.add(() => {
+                    inputFieldRR.value = rightInput.text;
+                })
+
+                inputFieldRR.addEventListener('keyup', (e) => {
+                    rightInput.text = inputFieldRR.value;
+                    console.log('change', inputFieldRR.value)
+                });
+
+                scene.onDisposeObservable.add(() => {
+                    inputFieldRR.remove();
+                })
+
+
+
+
+                // Our built-in 'ground' shape.
+            })
+            // var ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 6, height: 6}, scene);
+
+
+            return scene;
+        };
+        window.initFunction = async function () {
+
+
+            var asyncEngineCreation = async function () {
+                try {
+                    return createDefaultEngine();
+                } catch (e) {
+                    console.log("the available createEngine function failed. Creating the default engine instead");
+                    return createDefaultEngine();
+                }
+            }
+
+            window.engine = await asyncEngineCreation();
+            if (!engine) throw 'engine should not be null.';
+            startRenderLoop(engine, canvas);
+            window.scene = createScene();
+        };
+        initFunction().then(() => {
+            scene.then(returnedScene => {
+                sceneToRender = returnedScene;
+                console.log("left", getUrlParam("left"))
+                console.log("right", getUrlParam("right"))
+                console.log(window.location)
+
+            });
+
+
+
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+
+        function createPlaneTex(plane, text) {
+            if (text != null) {
+                var forLeftMeshadvancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(plane);
+
+                var button1 = BABYLON.GUI.Button.CreateSimpleButton("but1", text);
+                button1.width = 1;
+                button1.height = 1;
+                button1.color = "white";
+                button1.fontSize = 200;
+                button1.background = "green";
+                button1.onPointerUpObservable.add(function () {
+                    alert(text);
+                });
+                forLeftMeshadvancedTexture.addControl(button1);
+            }
+
+        }
+
+        function getUrlParam(name) {
+            var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)");
+            var r = window.location.search.substr(1).match(reg);
+            if (r != null) return decodeURI(r[2]); return null;
+        }
+        function shareURL(leftStr, rightStr) {
+
+            let url = window.location.href;
+            if (url.indexOf("?") > 0) {
+                url = url.split("?")[0];
+            }
+
+            url += "?left=" + encodeURI(leftStr)
+
+            url += "&right=" + encodeURI(rightStr)
+            return url;
+        }
+    </script>
+</body>
+
+</html>
