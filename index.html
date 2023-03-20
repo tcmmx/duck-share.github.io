@@ -172,11 +172,12 @@
 
                 let leftText = decodeURI(getUrlParam("left"));
                 let rightText = decodeURI(getUrlParam("right"));
-                if (leftText) {
+                console.log("kef", leftText)
+                if (leftText != null && leftText != "null") {
                     leftStr = leftText;
                     createPlaneTex(scene.getMeshById("lplane"), leftText)
                 }
-                if (rightText) {
+                if (rightText != null && rightText != "null") {
                     rightStr = rightText;
                     createPlaneTex(scene.getMeshById("rplane"), rightText)
                 }
