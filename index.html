@@ -37,11 +37,23 @@
             height: 100%;
             touch-action: none;
         }
+
+        #head {
+            color: gray;
+            /* display: block; */
+            position: absolute;
+            top: '20px';
+            left: '20px';
+
+        }
     </style>
 </head>
 
 <body>
+    <div id="head">Powered by <a href="https://www.babylonjs.com/" target="_blank">babylonjs</a>. Psyduck made by <a
+            href="https://twitter.com/Syourin1989?s=20" target="_blank">Lun Jiang</a> </div>
     <canvas id="renderCanvas"></canvas>
+
     <script>
         var canvas = document.getElementById("renderCanvas");
 
